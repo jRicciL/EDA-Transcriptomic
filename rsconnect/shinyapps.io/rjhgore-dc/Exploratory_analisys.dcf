@@ -1,0 +1,12 @@
+name: Exploratory_analisys
+title: Exploratory_analisys
+username:
+account: rjhgore-dc
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2052855
+bundleId: 2969446
+url: https://rjhgore-dc.shinyapps.io/Exploratory_analisys/
+when: 1586029680.26759
+asMultiple: FALSE
+asStatic: FALSE

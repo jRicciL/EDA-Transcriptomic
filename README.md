@@ -47,7 +47,26 @@ print(ip, row.names=FALSE)
 
 ```
 
-2. After check the package installation downolad the `app.R` file and run from an r session
+2. After check the package installation download the `app.R` file and run from an r session:
+
+**Method 1**
+
+```r
+shiny::runGitHub("EDA-Transcriptomic", username = "RJEGR", ref = "master",
+  subdir = "EDA-Transcriptomic", launch.browser = TRUE)
+```
+
+**Method 2**
+
+1. Click `Clone or download` button on the top of this page, then click [`Download ZIP`](https://github.com/swsoyee/EDA-Transcriptomic/archive/master.zip);
+2. Unzip the file to your working directory (use `getwd()` to know your working directory);
+3. Run the code of launching (according to your structure of working directory it may be different).
+
+```r
+
+shiny::runApp("~/EDA-Transcriptomic/", launch.browser = TRUE)
+```
+
 3. A web-app version can be used from [here](https://rjhgore-dc.shinyapps.io/Exploratory_analisys/). You can make a _fake_ dataset and run the app on the web:
 
 ```r
