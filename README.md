@@ -28,9 +28,9 @@ if(any(!.inst)) {
 .inst <- .bioc_packages %in% installed.packages()
 
 if(any(!.inst)) {
-  if (!requireNamespace("BiocManager", quietly = TRUE))
+  if (!requireNamespace("BiocManager", quietly = T))
     install.packages("BiocManager")
-  BiocManager::install(.bioc_packages[!.inst], ask = F)
+  BiocManager::install(.bioc_packages[!.inst], ask = F, suppressUpdates = T)
 }
 
 # Load packages into session, and print package version
@@ -49,21 +49,19 @@ print(ip, row.names=FALSE)
 
 2. After check the package installation download the `app.R` file and run from an r session:
 
-**Method 1**
+**Method 1** (Quick method)
 
 ```r
-shiny::runGitHub("EDA-Transcriptomic", username = "RJEGR", ref = "master",
-  subdir = "EDA-Transcriptomic", launch.browser = TRUE)
+shiny::runGitHub("EDA-Transcriptomic", username = "RJEGR", ref = "master", launch.browser = TRUE, subdir = 'stable/')
 ```
 
 **Method 2**
 
-1. Click `Clone or download` button on the top of this page, then click [`Download ZIP`](https://github.com/swsoyee/EDA-Transcriptomic/archive/master.zip);
+1. Click `Clone or download` button on the top of this page, then click [`Download ZIP/tar`](https://github.com/RJEGR/EDA-Transcriptomic/archive/master.tar.gz);
 2. Unzip the file to your working directory (use `getwd()` to know your working directory);
 3. Run the code of launching (according to your structure of working directory it may be different).
 
 ```r
-
 shiny::runApp("~/EDA-Transcriptomic/", launch.browser = TRUE)
 ```
 
