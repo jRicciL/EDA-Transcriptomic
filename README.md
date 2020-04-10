@@ -39,8 +39,11 @@ sapply(c(.cran_packages, .bioc_packages), require, character.only = TRUE)
 
 # Check version
 ip <- installed.packages()[,c(1,3)]
+
 rownames(ip) <- NULL
+
 ip <- ip[ip[,1] %in% c(.cran_packages,.bioc_packages),]
+
 print(ip, row.names=FALSE)
 
 

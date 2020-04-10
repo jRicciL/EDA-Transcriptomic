@@ -1,114 +1,28 @@
-# 
-options(shiny.maxRequestSize = 100*1024^10, stringsAsFactors = FALSE)
 
-# options(repos = BiocManager::repositories()
+library(shiny)
 
-# Start the dashboard ----
+source(file = "global.R", local = TRUE,  encoding = "UTF-8")
 
-# Sidebar (inputs) ----
-
-sidebar <- dashboardSidebar(
-  sidebarMenu(
-    id = "sider",
-    menuItemOutput("load")),
-  
-  fileInput("file1", "Choose a DE-result set",
-            multiple = TRUE),
-  #fileInput("file2", "Choose CSV metadata",
-  #          multiple = TRUE),
-  fileInput("file3", "Choose count-data",
-            multiple = TRUE),
-
-  textAreaInput(
-    "groupSelectViaText",
-    "Input your group info",
-    rows = 6,
-    placeholder = paste(
-      "Please input group information at here. Here is a example format:",
-      "-----",
-      "G1_rep1,Group1",
-      "G1_rep2,Group1",
-      "G1_rep3,Group1",
-      sep = '\n'
-    )
-  ),
-  
-  # Input: Experimental desing to compare
-  # Input an reactive selectiveInput later
-
-  selectizeInput("selectedSample", label = "Samples to compare:",
-                 choices = c('LOF_24DES','LOF_24POST',
-                             'LOF_24PRE','LOF_30DES',
-                             'LOF_30POST','LOF_30PRE'), 
-                 multiple = TRUE, 
-                 options = list(maxItems = 2)),
-  
-  actionButton("buttom", "Load!!"),
-  
-  helpText("Doble click to compare"),
-  
-  helpText("Play with the values above"), 
-  
-  # # 2. compare p-values distribution
-  
-  sliderInput('padj', 'Significance:', min = 0, max = 1,
-              value = 0.05, step = NULL, round = 2),
-  # 3. LogFC
-  numericInput('logfc', 'log2(Fold Change)', min = 1, max = 8,
-               value = 1, step = NA))
-
-
-# The body of the dash ----
-body <- dashboardBody(
-  # Here the first box with tabs
-  fluidRow(
-    tabBox(width = 12,
-      title = tagList(shiny::icon("gear"), "DE Visualization"),
-      
-      tabPanel("Pattern in expression",
-               mainPanel(
-                 plotly::plotlyOutput("areaPlot", width = "auto", height = "700px"))),
-      
-      tabPanel("Volcano Plot", 
-               mainPanel(
-                 plotOutput("volcano", width = "auto", height = "700px"))),
-      
-      tabPanel("P Values",  
-               mainPanel(
-                 plotly::plotlyOutput("phist", width = "auto", height = "700px"))),
-      
-      tabPanel("Significance genes",
-               mainPanel(
-                 plotly::plotlyOutput("sigdist", width = "auto", height = "700px")))
-      
-      ),
-    fluidRow(
-      infoBoxOutput("upgenesA"),
-      infoBoxOutput("upgenesB"))
-  )
-)
-
-
-
-# The server instructions ----
 
 server <- function(input, output) {
   output$load <- renderMenu({
     menuItem("Load data", icon = icon("refresh"))
   })
-  # Load DE results ----
+
+# Tables ----  
+  
+    # Load DE results ----
   contrast <- eventReactive(input$buttom, {
     
     sampleA <- input$selectedSample[1]
     sampleB <- input$selectedSample[2]
     
     res <- read.csv(input$file1$datapath, header=T, sep = '\t', row.names = NULL) 
-    
     res <- res %>% filter(sampleA == sampleA & sampleB == sampleB)
     
     names(res)[1] <- 'ids'
     
-    # res$pvalue[is.na(res$pvalue)]  <- 1
+    res$pvalue[is.na(res$pvalue)]  <- 1
     
     # round numeric:
     
@@ -117,7 +31,7 @@ server <- function(input, output) {
     #             round ,digits = 2)
     
     # checar por que no pasa como numerico el pvalue 
-    round2 <- res %>% select(-pvalue, -padj) %>% mutate_if(is.numeric, round ,digits = 2)
+    round2 <- res %>% select(-pvalue, -padj) %>% mutate_if(is.numeric, round ,digits = 2) %>% as.data.frame()
     
     # as_numeric <- res %>% select(pvalue, padj) %>% mutate_if(is.numeric, as.numeric)
     
@@ -205,7 +119,9 @@ server <- function(input, output) {
     
     
   })
-  
+
+# Visualization ----  
+
   # histogram ----
   
   output$phist <- renderPlotly({
@@ -395,7 +311,7 @@ server <- function(input, output) {
   #   valueBox(nrow(genes_B), icon = NULL, subtitle = caption)
   # })
   
-  # message menu istead of boxes
+  # message menu istead of boxes ----
   output$messageMenu <- renderMenu({
     
     sampleA <- unique(contrast()$sampleA)
@@ -430,46 +346,10 @@ server <- function(input, output) {
   
 }
 
-# Put them together into a dashboardPage ----
-# 
-
-ui <- dashboardPage(
-  dashboardHeader(title = "Transcriptomic dashboard",
-                  dropdownMenuOutput("messageMenu")),
-  sidebar,
-  body )
-
-shinyApp(ui, server)
-
-
-# test 
-# in the ui
-# Display this only if the density is shown
-# conditionalPanel(condition = "input.density == true",
-#                  sliderInput(inputId = "bw_adjust",
-#                              label = "Bandwidth adjustment:",
-#                              min = 0.2, max = 2, value = 1, step = 0.2)
-# )
-# 
-# # in the server
-# output$main_plot <- reactivePlot(width = 400, height = 300, function() {
-#   
-#   hist(faithful$eruptions,
-#        probability = TRUE,
-#        breaks = as.numeric(input$n_breaks),
-#        xlab = "Duration (minutes)",
-#        main = "Geyser eruption duration")
-#   
-#   if (input$individual_obs) {
-#     rug(faithful$eruptions)
-#   }
-#   
-#   if (input$density) {
-#     dens <- density(faithful$eruptions, adjust = input$bw_adjust)
-#     lines(dens, col = "blue")
-#   }
+#
+# shinyServer(function(input, output, session) {
+#   source(file = "server-simulation.R",
+#          local = TRUE,
+#          encoding = "UTF-8")
 #   
 # })
-# })
-
-

@@ -1,0 +1,12 @@
+library(shiny)
+library(plotly)
+library(data.table)
+library(reshape2)
+library(DT)
+library(tidyverse)
+library(shinydashboard)
+library(DESeq2)
+library(edgeR)
+require(EnhancedVolcano)
+
+options(shiny.maxRequestSize = 100*1024^10, stringsAsFactors = FALSE)
