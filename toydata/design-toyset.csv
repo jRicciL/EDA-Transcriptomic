@@ -1,0 +1,13 @@
+condition,sizeFactor,Rep,names
+sample1,G0,1.05216416343804,rep1,sample1
+sample2,G0,1.05404785657207,rep2,sample2
+sample3,G0,1.04432754486637,rep3,sample3
+sample4,G1,1.04309295433321,rep1,sample4
+sample5,G1,1.05038026189261,rep2,sample5
+sample6,G1,1.04468380410385,rep3,sample6
+sample7,G2,1.04214133680445,rep1,sample7
+sample8,G2,1.06072176942916,rep2,sample8
+sample9,G2,1.0410409459966,rep3,sample9
+sample10,G3,1.0417431754422,rep1,sample10
+sample11,G3,1.04464916687051,rep2,sample11
+sample12,G3,1.03598886018388,rep3,sample12
