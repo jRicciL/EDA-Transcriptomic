@@ -1,163 +1,119 @@
-# 
 
-options(shiny.maxRequestSize = 100*1024^10)
-options(repos = BiocManager::repositories())
+#
+options(shiny.maxRequestSize = 100*1024^10, stringsAsFactors = FALSE)
+#
 
 library(shiny)
 library(plotly)
-library(data.table)
-library(reshape2)
-library(DT)
-library(tidyverse)
-library(shinydashboard)
 library(DESeq2)
-require(EnhancedVolcano)
+library(tidyverse)
+library(DT)
+library(data.table)
+library(heatmaply)
 
+# UI SIDE-BAR ----
 
-# Start the dashboard ----
+sidebarPanel <- sidebarPanel(
+  titlePanel("trans-EDA"),
 
-# Sidebar (inputs) ----
-sidebar <- dashboardSidebar(
-  sidebarMenu(
-    menuItemOutput("load")),
+  fileInput("res", "Load the DE-result", multiple = TRUE),
+  fileInput("count", "Load the matrix-count", multiple = TRUE),
   
-  fileInput("file1", "Choose an R data-set",
-            multiple = TRUE),
+  #selectInput('sample', 'Select Sample:', choices = c('s1', 's2')),
   
-  fileInput("file2", "Choose CSV metadata",
-            multiple = TRUE),
-  
-  # Input: Experimental desing to compare
-  # Input an reactive selectiveInput later
-
-  selectizeInput("selectedSample", label = "Samples to compare:",
-                 choices = c('LOF_24DES','LOF_24POST',
-                             'LOF_24PRE','LOF_30DES',
-                             'LOF_30POST','LOF_30PRE'), 
-                 multiple = TRUE, 
-                 options = list(maxItems = 2)),
+  textAreaInput("groupSelectViaText",
+    "Input your group info",
+    rows = 6, placeholder = paste(
+      "Please input group information at here.",
+                                  "-----", 
+      "G1_rep1,Group1", "<enter-separated>G2_rep1,Group2", sep = "\n")),
   
   actionButton("buttom", "Load!!"),
   
-  helpText("Doble click to compare"),
-  
-  helpText("Play with the values above"), 
-  
-  # # 2. compare p-values distribution
+  h2(),
   
   sliderInput('padj', 'Significance:', min = 0, max = 1,
               value = 0.05, step = NULL, round = 2),
-  # 3. LogFC
+
   numericInput('logfc', 'log2(Fold Change)', min = 1, max = 8,
-               value = 1, step = NA))
+               value = 2, step = NA))
 
-
-# The body of the dash ----
-body <- dashboardBody(
-  # Here the first box with tabs
-  fluidRow(
-    tabBox(width = 12,
-      title = tagList(shiny::icon("gear"), "DE Visualization"),
-      
-      tabPanel("Pattern in expression",
-               mainPanel(
-                 plotly::plotlyOutput("areaPlot", width = "auto", height = "700px"))),
-      
-      tabPanel("Volcano Plot", 
-               mainPanel(
-                 plotOutput("volcano", width = "auto", height = "700px"))),
-      
-      tabPanel("P Values",  
-               mainPanel(
-                 plotly::plotlyOutput("phist", width = "auto", height = "700px"))),
-      
-      tabPanel("Significance genes",
-               mainPanel(
-                 plotly::plotlyOutput("sigdist", width = "auto", height = "700px")))
-      
-      ),
-    fluidRow(
-      infoBoxOutput("upgenesA"),
-      infoBoxOutput("upgenesB"))
+# UI - Render server to MainPanel ----
+tabsetPanel <- tabsetPanel(
+  tabPanel('Differential Expression significance', 
+           plotly::plotlyOutput("phist", width = "auto", height = "400px"),
+           plotly::plotlyOutput("pdist", width = "auto", height = "400px")),
+  
+  tabPanel('Tables',
+           plotly::plotlyOutput('areaPlot', width = "auto", height = "400px"),
+           DT::dataTableOutput('signif_ordered')),
+  
+  tabPanel('VolcanoPlot',
+           plotly::plotlyOutput('volcano', width = "auto", height = "400px")),
+  
+  tabPanel('Heatmap',
+           plotly::plotlyOutput('heatmap', width = "auto", height = "400px"))
   )
-)
 
-# Put them together into a dashboardPage ----
-ui <- dashboardPage(
+mainPanel <- mainPanel(
+  tabsetPanel)
+
+# UI-BUILD LAYOUT ----
+uidb <- dashboardPage(
   dashboardHeader(title = "Transcriptomic dashboard",
                   dropdownMenuOutput("messageMenu")),
-  sidebar,
-  body )
+  body = dashboardBody(tabsetPanel),
+  sidebar = dashboardSidebar(sidebarPanel, width = 350) )
+
+ui <- fluidPage(
+  sidebarLayout(
+    sidebarPanel,
+    mainPanel
+  )
 
 
-server <- function(input, output) {
-  output$load <- renderMenu({
-    menuItem("Load data", icon = icon("refresh"))
-  })
-  # dds table ----
+)
+
+# SERVER SIDE ----
+
+server <- function(input, output, session) {
   
-  dds <-  eventReactive(input$buttom, {
-    dds <- readRDS(file = input$file1$datapath)
-  })
+  help_text <- c("trans-EDA is a simple Exploratory Data Analysis dashboard. Pleas load your Differential Expresion results and count-matrix to start")
   
-  contrast <- eventReactive(input$buttom, {
-    
-    sampleA <- input$selectedSample[1]
-    sampleB <- input$selectedSample[2]
-    
-    contrast <- c("conditions", sampleA, sampleB)
-    
-    .res = results(dds(), contrast)
-    
-    baseMeanA <- rowMeans(counts(dds(), normalized=TRUE)[,colData(dds())$conditions == sampleA])
-    baseMeanB <- rowMeans(counts(dds(),normalized=TRUE)[,colData(dds())$conditions == sampleB])
-    
-    
-    res = cbind(baseMeanA, baseMeanB, as.data.frame(.res))
-    
-    res = cbind(round(select(res, -pvalue, -padj), 
-                      digits = 2),
-                select(res, pvalue, padj))
-    
-    res = cbind(sampleA=sampleA, sampleB=sampleB, as.data.frame(res))
-    
-    res$padj[is.na(res$padj)]  <- 1
-    
-    
-    res <- data.table(res, ids = rownames(.res)) 
-    
-    # res <- res %>% rename(log2FC = log2FoldChange)
-    
+  showModal(modalDialog(help_text))
+  
+  # TAB-1 ----
+  sam <- eventReactive(input$buttom, {
+    sam <- fread(input$groupSelectViaText, header = FALSE, col.names = c('name','group'))
   })
   
-  output$contrast <- DT::renderDataTable(
+  loadResults <- function(datapath) {
+    
+    read.csv(datapath, header=T, sep = '\t') %>%
+      as_tibble(rownames = "ids") %>%
+      mutate_at(vars(!matches("ids|sample|pvalue|padj")),
+                round ,digits = 2)
+  }
+  
+  DE <- eventReactive(input$buttom, {
+    
+    samples <- names(table(sam()$group))
+    sampleA <- samples[1]
+    sampleB <- samples[2]
+    
+    DE <- loadResults(input$res$datapath) %>%
+      filter(sampleA == sampleA & sampleB == sampleB)
+  })
+  
+  output$DE <- DT::renderDataTable(
     DT::datatable(
-      contrast()))
-  
-  # Metadata ----
-  
-  sam <- eventReactive(input$buttom, {    
-    
-    sam <- read.table(input$file2$datapath,
-                      header = TRUE,
-                      check.names = F, 
-                      fill=T)
-    sam = sam[sam[,2] != '',]
-    # colnames(sam) = c('sample_name', 'replicate_name', 'f1','f2')
-    
-  })
-  
-  output$sam <- DT::renderDataTable(
-    DT::datatable(sam(), 
-                  options = list(searching = FALSE)))
-  
-  # histogram ----
-  
+      DE()))
+
   output$phist <- renderPlotly({
     
     col <- c("#899FE7", "#de2d26")
     
-    hist <- contrast() %>%
+    hist <- DE() %>%
       mutate(padjCol = ifelse(padj <= input$padj, "Used", "Dropped")) %>%
       filter(pvalue < 1) %>% 
       plot_ly(x = ~pvalue, 
@@ -171,19 +127,18 @@ server <- function(input, output) {
     plotly_build(hist)
   })
   
-  # Significanse gene distribution ---- 
-  
-  output$sigdist <- renderPlotly({
+  output$pdist <- renderPlotly({
     
-    signif <- contrast()[contrast()$padj <= input$padj]
+    signif <- DE() %>% 
+     mutate(padjCol = ifelse(padj <= input$padj, "Used", "Dropped")) %>%
+     mutate(logpvalue = -log10(pvalue)) %>%
+     mutate(log2FoldChange = abs(log2FoldChange)) %>% 
+     filter(padj <= input$padj)
     
-    if(nrow(signif) > 500) {
+    if(nrow(signif) > 1000) {
       
-      p <- contrast() %>%
-        mutate(padjCol = ifelse(padj <= input$padj, "Used", "Dropped")) %>%
-        mutate(logpvalue = -log10(pvalue)) %>%
-        mutate(log2FoldChange = abs(log2FoldChange)) %>%
-        sample_n(500) %>%
+      p <- signif %>%
+        sample_n(1000) %>%
         plot_ly(x = ~ logpvalue, y = ~padj, color = ~log2FoldChange,
                 type = 'scatter',
                 mode = 'markers', 
@@ -198,10 +153,7 @@ server <- function(input, output) {
       plotly_build(p) 
     } else {
       
-      p <- contrast() %>%
-        mutate(padjCol = ifelse(padj <= input$padj, "Used", "Dropped")) %>%
-        mutate(logpvalue = -log10(pvalue)) %>%
-        mutate(log2FoldChange = abs(log2FoldChange)) %>%
+      p <- signif %>%
         filter(padj <= input$padj) %>%
         plot_ly(x = ~ logpvalue, y = ~padj, color = ~log2FoldChange,
                 type = 'scatter',
@@ -220,21 +172,38 @@ server <- function(input, output) {
     
   })
   
-  # Area plot ----
+  # TAB-2 ----
   
+
   signif_ordered <- reactive({
+    signif <- DE() %>% filter(padj <= input$padj)
     
-    signif <- contrast()[contrast()$padj <= input$padj]
+    genes_A <- signif %>% filter(log2FoldChange >= input$logfc) %>%
+      arrange(desc(abs(log2FoldChange)))
     
-    genes_A <- signif[signif$log2FoldChange >= input$logfc]
-    genes_A <- genes_A[order(abs(genes_A$log2FoldChange), decreasing = TRUE), ]
-    
-    genes_B <- signif[signif$log2FoldChange <= -input$logfc]
-    genes_B <- genes_B[order(abs(genes_B$log2FoldChange), decreasing = FALSE), ]
-    
+    genes_B <- signif %>% filter(log2FoldChange <= -input$logfc) %>%
+      arrange(desc(abs(log2FoldChange)))
     
     signif_ordered <- rbind(genes_A, genes_B)
     
+  })
+  
+  dds <- eventReactive(input$buttom, {    
+    
+    x <- read.table(input$count$datapath, header=T, com='')
+    
+    countData <- round(x)
+    
+    colData <- names(countData)
+    
+    colData <- data.frame(conditions=factor(colData), row.names = colData)
+    
+    dds <- DESeqDataSetFromMatrix(
+      countData = countData,
+      colData = colData,
+      design = ~ conditions)
+    
+    dds <- estimateSizeFactors(dds)
   })
   
   normalized_sig_counts <- reactive({
@@ -242,40 +211,28 @@ server <- function(input, output) {
     signifGenes <- unique(signif_ordered()$ids)
     
     counts(dds(), normalized = TRUE)[signifGenes, ] %>%
-      reshape2::melt() %>%
-      inner_join(sam(), by = c("Var2"= "names")) %>%
-      data.frame() -> join_normalized_sig_counts
+      as_tibble(rownames = 'ids') %>% 
+      pivot_longer(-ids) %>%
+      inner_join(sam()) -> x
     
-    # mean the replicates
-    aggregate(join_normalized_sig_counts$value, 
-              by = list(join_normalized_sig_counts$Var1, 
-                        join_normalized_sig_counts$conditions), 
-              mean) ->  x
-    
-    x <- data.table(genes = factor(x[,1], levels = signifGenes), 
-                    conditions = x[,2], 
-                    value = x[,3])
-    
+    n <- length(unique(sam()$group))
+    if(n > 1) {
+      # mean the replicates
+      
+      normalized_sig_counts <- x %>%
+        group_by(ids, group) %>%
+        summarise(value = mean(value)) %>%
+        ungroup()
+
+
+    } else { normalized_sig_counts <- x }
     
   })
   
   output$areaPlot <- renderPlotly({
     
-    sample_color <- viridis::viridis(6)
-    
-    areaPlot <- normalized_sig_counts() %>%
-      
-      mutate(nsample = as.integer(factor(conditions))) %>% 
-      
-      plot_ly(x= ~genes, y = ~ value, 
-              color = ~ conditions,
-              fill = 'tonexty',
-              mode = 'none',
-              colors = sample_color,
-              yaxis = ~ paste0("y", nsample)) %>%
-      add_lines() %>%
-      subplot(nrows = length(sample_color),
-              shareX = TRUE)
+    n <- length(unique(sam()$group))
+    sample_color <- viridis::viridis(n)
     
     f1 <- list(
       family = "Arial, sans-serif",
@@ -286,79 +243,157 @@ server <- function(input, output) {
       tickangle = 45,
       tickfont = f1)
     
-    areaPlot <- areaPlot %>% layout(xaxis = z1,
-                                    xaxis = list(title = "cpm"))      
+    
+    areaPlot <- normalized_sig_counts() %>%
+      mutate(nsample = as.integer(factor(group))) %>%
+      plot_ly(x = ~ids, 
+              y = ~value, 
+              color = ~group,
+              fill = 'tonexty',
+              colors = sample_color,
+              yaxis = ~paste0("y", sort(nsample, decreasing =F))) %>%
+      layout(
+        xaxis = z1,
+        yaxis = f1,
+        hoverlabel = list(font=list(size=20))
+      ) %>% 
+      add_lines() %>%
+      subplot(nrows = length(sample_color), shareX = TRUE)
     
     plotly_build(areaPlot)
+    
+# 
+#     panel <- . %>% 
+#       plot_ly(x = ~ids, y = ~value,
+#               color = ~ group,
+#               fill = 'tonexty',
+#               mode = 'none',
+#               colors = sample_color) %>%
+#       add_lines(color = ~ group) %>%
+#       add_annotations(
+#         text = ~unique(group),
+#         x = 0.5,
+#         y = 1,
+#         yref = "paper",
+#         xref = "paper",
+#         yanchor = "bottom",
+#         showarrow = FALSE,
+#         font = list(size = 15)
+#       )  %>%
+#       layout(
+#         showlegend = F,
+#         xaxis = z1,
+#         xaxis = list(title = "Count Per million")
+#       )
+#     # 
+    # areaPlot <- normalized_sig_counts() %>%
+    #   group_by(group) %>%
+    #   do(p = panel(.)) %>%
+    #   subplot(nrows = NROW(.), shareX = TRUE)
+    # 
+    #  
+    # 
+
   })
   
-  # volcano plot ---- 
+  # not rendered yet
+  output$sam <- DT::renderDataTable(
+    DT::datatable(
+      sam()))
   
-  require(EnhancedVolcano) 
+  output$signif_ordered <- DT::renderDataTable(
+    DT::datatable(
+      signif_ordered(),
+      extensions = 'Buttons', 
+      options = list(
+        pageLength = 25,  
+        dom = 'Bfrtip',
+        buttons = 
+          list('copy', 'print', list(
+            extend = 'collection',
+            buttons = c('csv', 'excel'),
+            text = 'Download'
+          )))
+      ))
   
-  output$volcano <- renderPlot({
+  # volcano 
+  
+  output$volcano <-  renderPlotly({
     
-    pCutoff <- round(max(contrast()[contrast()$padj <= 0.05, 'pvalue']), digits = 7)          
+    colors <- c("red2", "forestgreen", "grey30")
     
-    # sampleA <- unique(contrast()$sampleA)
-    # sampleB <- unique(contrast()$sampleB)
-    # title <- paste0(sampleA, '_vs_', sampleB)
+    sigfc <- "<b>P</b>-value & Log<sub>2</sub> FC"
+    fc <- "Log<sub>2</sub> FC"
     
+    vline <- function(x = 0, color = "black") {
+      list(
+        type = "line", 
+        y0 = 0, 
+        y1 = 1, 
+        yref = "paper",
+        x0 = x, 
+        x1 = x, 
+        line = list(color = color, dash='dot', width=1)
+      )
+    }
     
-    v <- EnhancedVolcano(contrast(),
-                         lab = contrast()$ids,
-                         pCutoff = pCutoff,
-                         FCcutoff = input$logfc,
-                         boxedLabels = FALSE,
-                         colAlpha = 3/5,
-                         x = 'log2FoldChange',
-                         y = 'pvalue',
-                         title = '',
-                         legendPosition = 'top',
-                         subtitle = '',
-                         caption = '')
+    hline <- function(y = 0, color = "black") {
+      list(
+        type = "line", 
+        x0 = 0, 
+        x1 = 1, 
+        xref = "paper",
+        y0 = y, 
+        y1 = y, 
+        line = list(color = color, dash='dot', width=1)
+      )
+    }
+
+    vplot <- DE() %>%
+      sample_n(1000) %>%
+      mutate(pvalue = ifelse(is.na(pvalue), 1, pvalue)) %>%
+      mutate(padjCol = "NS") %>%
+      mutate(padjCol = ifelse(padj <= input$padj & 
+                                abs(log2FoldChange) >= input$logfc, sigfc, fc)) %>%
+      mutate(padjCol = factor(padjCol, levels = c(sigfc, fc, "NS"))) %>%
+      plot_ly(x = ~ log2FoldChange , y = ~ -log10(pvalue),
+              type = "scatter", mode = "markers", 
+              hoverinfo = "text", text = ~ ids,
+              color = ~ padjCol,
+              colors = colors,
+              marker = list(size = 10, opacity = 0.5, line = list(width = 2))) %>%
+      layout(shapes = list(vline(-input$logfc), 
+                           vline(input$logfc), 
+                           hline(log10(input$padj)))) %>%
+      layout( yaxis = list(title = "-Log<sub>10</sub><b>P</b>"),
+              xaxis = list(title = "Log<sub>2</sub> Fold Change"),
+              legend = list(x = 0.35, y = -0.5))
     
-    print(v)
+    plotly_build(vplot)
+    
   })
   
-  # Boxes ---- 
-  # output$upgenesA <- renderValueBox({
-  #   sampleA <- unique(contrast()$sampleA)
-  #   caption <- paste0("Up-genes in sample ", sampleA)
-  #   
-  #   signif <- contrast()[contrast()$padj <= input$padj]
-  #   genes_A <- signif[signif$log2FoldChange >= input$logfc]
-  #   valueBox(nrow(genes_A), icon = NULL, subtitle = caption)
-  # })
-  # 
-  # output$upgenesB <- renderValueBox({
-  #   sampleB <- unique(contrast()$sampleB)
-  #   caption <- paste0("Up-genes in sample ", sampleB)
-  #   
-  #   signif <- contrast()[contrast()$padj <= input$padj]
-  #   genes_B <- signif[signif$log2FoldChange <= -input$logfc]
-  #   valueBox(nrow(genes_B), icon = NULL, subtitle = caption)
-  # })
   
-  # message menu istead of boxes
-  output$messageMenu <- renderMenu({
-    
-    sampleA <- unique(contrast()$sampleA)
-    sampleB <- unique(contrast()$sampleB)
+  # message menu istead of boxes ----
+  # output$messageMenu <- renderMenu({
+    observeEvent(input$buttom, {  
+    samples <- names(table(sam()$group))
+    sampleA <- samples[1]
+    sampleB <- samples[2]
     
     caption <- paste0("Up-genes in sample ", sampleA)
     caption <- paste0("Up-genes in sample ", sampleB)
     
-    signif <- contrast()[contrast()$padj <= input$padj]
+    signif <- DE() %>%
+      filter(padj <= input$padj)
     
-    n_genes_A <- nrow(signif[signif$log2FoldChange >= input$logfc])
-    n_genes_B <- nrow(signif[signif$log2FoldChange <= -input$logfc])
+    n_genes_A <- signif %>% filter(log2FoldChange >= input$logfc) %>% distinct(ids) %>% nrow
+    n_genes_B <- signif %>% filter(log2FoldChange <= -input$logfc) %>% distinct(ids) %>% nrow
     
     messageA <- paste0(n_genes_A ," ", caption)
     messageB <- paste0(n_genes_B ," ", caption)
     
-    # pct_signif <- round(nrow(signif) / nrow(contrast()), 2)
-    
+
     messageC <- paste0(nrow(signif) ," significance genes")
     
     messageA <- data.frame(from = sampleA, message = messageA)
@@ -366,17 +401,46 @@ server <- function(input, output) {
     messageC <- data.frame(from = 'Total', message = messageC)
     
     messageData <- rbind(messageA, messageB, messageC)
-
+    
     msgs <- apply(messageData, 1, function(row) {
       messageItem(from = row[["from"]], message = row[["message"]])
     })
-    dropdownMenu(type = "messages", .list = msgs)
+    
+    #dropdownMenu(type = "messages", .list = msgs)
+    showNotification(msgs, type = "message")
   })
   
+  # Heatmap ----
+  
+  output$heatmap <-  renderPlotly({
+    
+    minl <- min(normalized_sig_counts()$value)
+    maxl <- max(normalized_sig_counts()$value)
+    
+    # row_side_colors <- colData(dds)
+    # row_side_colors <- sam[, sam$group]
+ 
+    normalized_sig_counts() %>%
+      pivot_wider(names_from = group, values_from = value,  
+                  values_fill = list(value = 0)) %>%
+      data.frame(row.names = 1) %>% 
+      heatmaply(
+        seriate = "mean", 
+        showticklabels = c(TRUE, FALSE),
+        limits = c(minl, maxl),
+        plot_method = "plotly",
+        k_row = 3, k_col = 2
+        # row_side_colors = row_side_colors
+      )
+  })
+  
+  
+    
+
 }
 
-shinyApp(ui, server)
+shinyApp(ui = ui, server = server)
 
-
+# sam <- fread(c("LOF_24DES_1,LOF_24DES\nLOF_24DES_2,LOF_24DES\nLOF_24DES_3,LOF_24DES\nLOF_24POST_1,LOF_24POST\nLOF_24POST_2,LOF_24POST\nLOF_24POST_3,LOF_24POST"), header = FALSE, col.names = c('name','group'))
 
 
