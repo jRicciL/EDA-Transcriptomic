@@ -68,7 +68,7 @@ shiny::runGitHub("EDA-Transcriptomic", username = "RJEGR", ref = "master", launc
 shiny::runApp("~/EDA-Transcriptomic/", launch.browser = TRUE)
 ```
 
-3. A web-app version can be used from [here](https://rjhgore-dc.shinyapps.io/Exploratory_analisys/). You can make or use the _toy_ dataset here and run the app on the web:
+3. A deployed version can be used from [here]( https://rjhgore-dc.shinyapps.io/stable/). Also, you can make or use the [_toy_ dataset](https://github.com/RJEGR/EDA-Transcriptomic/tree/master/toydata) here and run the launched app:
 
 ```r
 
@@ -121,3 +121,8 @@ sample11,G3
 sample12,G3
 ```
 
+
+
+Example:
+
+![](./Figures/load-data-figure.png)
