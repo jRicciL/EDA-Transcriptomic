@@ -1,7 +1,9 @@
 
 #
-options(shiny.maxRequestSize = 100*1024^10, stringsAsFactors = FALSE)
-#
+options(shiny.maxRequestSize = 100*1024^10, 
+        stringsAsFactors = FALSE,
+        repos = BiocManager::repositories())
+
 
 library(shiny)
 library(plotly)
@@ -33,7 +35,7 @@ sidebarPanel <- sidebarPanel(
   h2(),
   
   sliderInput('padj', 'Significance:', min = 0, max = 1,
-              value = 0.05, step = NULL, round = 2),
+              value = 1, step = NULL, round = 2),
 
   numericInput('logfc', 'log2(Fold Change)', min = 1, max = 8,
                value = 2, step = NA))
@@ -59,11 +61,11 @@ mainPanel <- mainPanel(
   tabsetPanel)
 
 # UI-BUILD LAYOUT ----
-uidb <- dashboardPage(
-  dashboardHeader(title = "Transcriptomic dashboard",
-                  dropdownMenuOutput("messageMenu")),
-  body = dashboardBody(tabsetPanel),
-  sidebar = dashboardSidebar(sidebarPanel, width = 350) )
+# uidb <- dashboardPage(
+#   dashboardHeader(title = "Transcriptomic dashboard",
+#                   dropdownMenuOutput("messageMenu")),
+#   body = dashboardBody(tabsetPanel),
+#   sidebar = dashboardSidebar(sidebarPanel, width = 350) )
 
 ui <- fluidPage(
   sidebarLayout(
