@@ -18,8 +18,10 @@ library(heatmaply)
 sidebarPanel <- sidebarPanel(
   titlePanel("trans-EDA"),
 
-  fileInput("res", "Load the DE-result", multiple = TRUE),
-  fileInput("count", "Load the matrix-count", multiple = TRUE),
+  fileInput("res", "Load the DE-result", multiple = TRUE, 
+            accept=c('.DE_results', '.rds')),
+  fileInput("count", "Load the matrix-count", multiple = TRUE, 
+            accept=c('.matrix', '.csv')),
   
   #selectInput('sample', 'Select Sample:', choices = c('s1', 's2')),
   
@@ -84,9 +86,35 @@ server <- function(input, output, session) {
   
   showModal(modalDialog(help_text))
   
+  #****************************
+  # Handle null or empty inputs
+  #****************************
+  # observe for not null inputs 
+  observe({
+    input$buttom # Take a dependence on button
+    groupinfo_load <- input$groupSelectViaText == ''
+    res_load <- is.null(input$res)
+    count_load <- is.null(input$count)
+    
+    # If any imput is null  show info
+    if(res_load){
+      showNotification('Please upload your DE-result')
+    } else if(count_load) {
+      showNotification('Please upload your matrix coounts file.')
+    } else if(count_load) {
+      showNotification('Please paste your group information in the left-panel box.')
+    }
+  })
+
+  # req to handle null inputs inside reactive functions
+  check_empty_inputs <- function() { req(input$res, input$count, input$groupSelectViaText) }
+  #****************************
+  
   # TAB-1 ----
   sam <- eventReactive(input$buttom, {
-    sam <- fread(input$groupSelectViaText, header = FALSE, col.names = c('name','group'))
+    check_empty_inputs()
+    group_info <- input$groupSelectViaText
+    sam <- fread(group_info, header = FALSE, col.names = c('name','group'))
   })
   
   loadResults <- function(datapath) {
@@ -98,7 +126,7 @@ server <- function(input, output, session) {
   }
   
   DE <- eventReactive(input$buttom, {
-    
+    check_empty_inputs()
     samples <- names(table(sam()$group))
     sampleA <- samples[1]
     sampleB <- samples[2]
