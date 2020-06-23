@@ -198,7 +198,7 @@ server <- function(input, output) {
     
     dds <- DESeqDataSetFromMatrix(
       countData = countData,
-      colData = conditions,
+      colData = colData,
       design = ~ conditions)
     
     dds <- estimateSizeFactors(dds)
