@@ -36,11 +36,13 @@ sidebarPanel <- sidebarPanel(
   
   h2(),
   
-  sliderInput('padj', 'Significance:', min = 0, max = 1,
-              value = 1, step = NULL, round = 2),
+  sliderInput('padj', 'Significance:', min = 0.01, max = 1,
+              value = 0.95, step = NULL, round = 2),
 
   numericInput('logfc', 'log2(Fold Change)', min = 1, max = 8,
-               value = 2, step = NA))
+               value = 2, step = NA),
+  )
+  
 
 # UI - Render server to MainPanel ----
 tabsetPanel <- tabsetPanel(
@@ -346,62 +348,90 @@ server <- function(input, output, session) {
           )))
       ))
   
-  # volcano 
+  #********************************
+  # VOLCANO PLOT
+  #********************************
   
+  # Helper funtions to draw vertical an horizontal lines with plotly
+  vline <- function(x = 0, ... ){
+    list(type='line', y0=0, y1=1, yref='paper',
+         x0 = x, x1 = x,
+         ...)}
+  hline <- function(y = 0, ... ){
+    list(type='line', x0=0, x1=1, xref='paper',
+         y0=y, y1=y,
+         ...)}
+  # Default dashed line format
+  dashed_line = list(color='black', dash='dot', widt = 0.8)
+  
+  #********************************
   output$volcano <-  renderPlotly({
+    # Input values
+    pCutoff <- input$padj
+    nlog_pCutoff <- -log10(pCutoff)
+    fcCutoff <- input$logfc
     
-    colors <- c("red2", "forestgreen", "grey30")
+    # Sig. Labels
+    sig_labels = c('p-value and log<sub>2</sub>FC', 'p-value', 'log<sub>2</sub>FC', 'NS')
+    volcano_colors = c('#DC0D0D',  '#27A871', '#0D8DB0', '#80847C')
     
-    sigfc <- "<b>P</b>-value & Log<sub>2</sub> FC"
-    fc <- "Log<sub>2</sub> FC"
+    # Temporal: Use  pvalue, just for comparisson
     
-    vline <- function(x = 0, color = "black") {
-      list(
-        type = "line", 
-        y0 = 0, 
-        y1 = 1, 
-        yref = "paper",
-        x0 = x, 
-        x1 = x, 
-        line = list(color = color, dash='dot', width=1)
+    # Get DE table
+    X <- DE() %>% na.omit() %>% 
+      # TODO: Only work with padj?
+      mutate(
+        neg_log10_p = -log10(pvalue)
+        ) %>%
+      mutate(signif_col  =
+            ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[1],
+            ifelse(neg_log10_p <  nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[2],
+            ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) <  fcCutoff, sig_labels[3],
+            sig_labels[4]
+          )))
+      ) %>%
+      mutate(signif_col = factor(signif_col, levels = sig_labels)) 
+    # Subset some of the non-significative genes to ommit overload the plot
+    non_sig <- filter(X, signif_col == 'NS')
+    if (nrow(non_sig) > 1000){
+      X <- rbind(
+        # Subset non significative values
+        filter(X, signif_col != 'NS'),
+        # Keep a third of NS values
+        non_sig %>% sample_n(nrow(non_sig) %/% 3)
       )
     }
     
-    hline <- function(y = 0, color = "black") {
-      list(
-        type = "line", 
-        x0 = 0, 
-        x1 = 1, 
-        xref = "paper",
-        y0 = y, 
-        y1 = y, 
-        line = list(color = color, dash='dot', width=1)
-      )
-    }
-
-    vplot <- DE() %>%
-      sample_n(1000) %>%
-      mutate(pvalue = ifelse(is.na(pvalue), 1, pvalue)) %>%
-      mutate(padjCol = "NS") %>%
-      mutate(padjCol = ifelse(padj <= input$padj & 
-                                abs(log2FoldChange) >= input$logfc, sigfc, fc)) %>%
-      mutate(padjCol = factor(padjCol, levels = c(sigfc, fc, "NS"))) %>%
-      plot_ly(x = ~ log2FoldChange , y = ~ -log10(pvalue),
-              type = "scatter", mode = "markers", 
-              hoverinfo = "text", text = ~ ids,
-              color = ~ padjCol,
-              colors = colors,
-              marker = list(size = 10, opacity = 0.5, line = list(width = 2))) %>%
-      layout(shapes = list(vline(-input$logfc), 
-                           vline(input$logfc), 
-                           hline(log10(input$padj)))) %>%
-      layout( yaxis = list(title = "-Log<sub>10</sub><b>P</b>"),
-              xaxis = list(title = "Log<sub>2</sub> Fold Change"),
-              legend = list(x = 0.35, y = -0.5))
+    # Create the Volcano plot unisng plotly
+    volPlotly <- X %>% 
+      plot_ly() %>%
+      add_trace(type='scatter', mode='markers',
+                x = ~log2FoldChange, y = ~neg_log10_p, 
+                color = ~signif_col, colors=volcano_colors, alpha=0.7,
+                hoverinfo='none') %>%
+      layout(shapes = list(vline(x = fcCutoff, line = dashed_line), 
+                           vline(x = -fcCutoff, line = dashed_line), 
+                           hline(y = nlog_pCutoff, line = dashed_line)))
+    # Add Significative genes as a new trace 
+    X_sig <- X %>% filter(signif_col == sig_labels[1])
+    volPlotly <- volPlotly %>%  
+      add_trace(type='scatter', mode='markers',
+                x = X_sig$log2FoldChange, y = X_sig$neg_log10_p,
+                hoverinfo = 'text', text = X_sig$ids, 
+                showlegend=FALSE,
+                marker=list(color=volcano_colors[1], 
+                            size=7,
+                            line=list(color = 'black',
+                                      width=0.5))) %>%
+      layout( yaxis = list(title = "-log<sub>10</sub>p"),
+              xaxis = list(title = "log<sub>2</sub> Fold Change", zeroline=FALSE),
+              legend = list(x = 0.45, y = -0.2,
+                            orientation='h', xanchor='center'))
     
-    plotly_build(vplot)
+    volPlotly
     
   })
+  #*********************************
   
   
   # message menu istead of boxes ----
