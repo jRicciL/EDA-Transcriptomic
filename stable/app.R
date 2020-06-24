@@ -365,29 +365,25 @@ server <- function(input, output, session) {
   dashed_line = list(color='black', dash='dot', widt = 0.8)
   
   #********************************
-  output$volcano <-  renderPlotly({
+  # Reactive data filter
+  get_X_volcano <- reactive({
+    
     # Input values
     pCutoff <- input$padj
     nlog_pCutoff <- -log10(pCutoff)
     fcCutoff <- input$logfc
     
-    # Sig. Labels
-    sig_labels = c('p-value and log<sub>2</sub>FC', 'p-value', 'log<sub>2</sub>FC', 'NS')
-    volcano_colors = c('#DC0D0D',  '#27A871', '#0D8DB0', '#80847C')
-    
-    # Temporal: Use  pvalue, just for comparisson
-    
     # Get DE table
     X <- DE() %>% na.omit() %>% 
-      # TODO: Only work with padj?
+      # TODO: Only work with padj? Why combine both?
       mutate(
         neg_log10_p = -log10(pvalue)
-        ) %>%
+      ) %>%
       mutate(signif_col  =
-            ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[1],
-            ifelse(neg_log10_p <  nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[2],
-            ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) <  fcCutoff, sig_labels[3],
-            sig_labels[4]
+              ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[1],
+              ifelse(neg_log10_p <  nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[2],
+              ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) <  fcCutoff, sig_labels[3],
+                  sig_labels[4]
           )))
       ) %>%
       mutate(signif_col = factor(signif_col, levels = sig_labels)) 
@@ -401,6 +397,24 @@ server <- function(input, output, session) {
         non_sig %>% sample_n(nrow(non_sig) %/% 3)
       )
     }
+    
+    return(X)
+  })
+  
+  #********************************
+  output$volcano <-  renderPlotly({
+    
+    # Input values
+    pCutoff <- input$padj
+    nlog_pCutoff <- -log10(pCutoff)
+    fcCutoff <- input$logfc
+    
+    # Get the filtered data
+    X <- get_X_volcano()
+    
+    # Sig. Labels
+    sig_labels = c('p-value and log<sub>2</sub>FC', 'p-value', 'log<sub>2</sub>FC', 'NS')
+    volcano_colors = c('#DC0D0D',  '#27A871', '#0D8DB0', '#80847C')
     
     # Create the Volcano plot unisng plotly
     volPlotly <- X %>% 
