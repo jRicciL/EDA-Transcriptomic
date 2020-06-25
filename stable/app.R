@@ -17,7 +17,7 @@ library(heatmaply)
 
 sidebarPanel <- sidebarPanel(
   titlePanel("trans-EDA"),
-
+  
   fileInput("res", "Load the DE-result", multiple = TRUE, 
             accept=c('.DE_results', '.rds')),
   fileInput("count", "Load the matrix-count", multiple = TRUE, 
@@ -26,11 +26,11 @@ sidebarPanel <- sidebarPanel(
   #selectInput('sample', 'Select Sample:', choices = c('s1', 's2')),
   
   textAreaInput("groupSelectViaText",
-    "Input your group info",
-    rows = 6, placeholder = paste(
-      "Please input group information at here.",
-                                  "-----", 
-      "G1_rep1,Group1", "<enter-separated>G2_rep1,Group2", sep = "\n")),
+                "Input your group info",
+                rows = 6, placeholder = paste(
+                  "Please input group information at here.",
+                  "-----", 
+                  "G1_rep1,Group1", "<enter-separated>G2_rep1,Group2", sep = "\n")),
   
   actionButton("buttom", "Load!!"),
   
@@ -38,11 +38,11 @@ sidebarPanel <- sidebarPanel(
   
   sliderInput('padj', 'Significance:', min = 0.01, max = 1,
               value = 0.95, step = NULL, round = 2),
-
+  
   numericInput('logfc', 'log2(Fold Change)', min = 1, max = 8,
                value = 2, step = NA),
-  )
-  
+)
+
 
 # UI - Render server to MainPanel ----
 tabsetPanel <- tabsetPanel(
@@ -59,7 +59,7 @@ tabsetPanel <- tabsetPanel(
   
   tabPanel('Heatmap',
            plotly::plotlyOutput('heatmap', width = "auto", height = "400px"))
-  )
+)
 
 mainPanel <- mainPanel(
   tabsetPanel)
@@ -76,8 +76,8 @@ ui <- fluidPage(
     sidebarPanel,
     mainPanel
   )
-
-
+  
+  
 )
 
 # SERVER SIDE ----
@@ -107,7 +107,7 @@ server <- function(input, output, session) {
       showNotification('Please paste your group information in the left-panel box.')
     }
   })
-
+  
   # req to handle null inputs inside reactive functions
   check_empty_inputs <- function() { req(input$res, input$count, input$groupSelectViaText) }
   #****************************
@@ -140,7 +140,7 @@ server <- function(input, output, session) {
   output$DE <- DT::renderDataTable(
     DT::datatable(
       DE()))
-
+  
   output$phist <- renderPlotly({
     
     col <- c("#899FE7", "#de2d26")
@@ -162,10 +162,10 @@ server <- function(input, output, session) {
   output$pdist <- renderPlotly({
     
     signif <- DE() %>% 
-     mutate(padjCol = ifelse(padj <= input$padj, "Used", "Dropped")) %>%
-     mutate(logpvalue = -log10(pvalue)) %>%
-     mutate(log2FoldChange = abs(log2FoldChange)) %>% 
-     filter(padj <= input$padj)
+      mutate(padjCol = ifelse(padj <= input$padj, "Used", "Dropped")) %>%
+      mutate(logpvalue = -log10(pvalue)) %>%
+      mutate(log2FoldChange = abs(log2FoldChange)) %>% 
+      filter(padj <= input$padj)
     
     if(nrow(signif) > 1000) {
       
@@ -206,7 +206,7 @@ server <- function(input, output, session) {
   
   # TAB-2 ----
   
-
+  
   signif_ordered <- reactive({
     signif <- DE() %>% filter(padj <= input$padj)
     
@@ -255,8 +255,8 @@ server <- function(input, output, session) {
         group_by(ids, group) %>%
         summarise(value = mean(value)) %>%
         ungroup()
-
-
+      
+      
     } else { normalized_sig_counts <- x }
     
   })
@@ -294,30 +294,30 @@ server <- function(input, output, session) {
     
     plotly_build(areaPlot)
     
-# 
-#     panel <- . %>% 
-#       plot_ly(x = ~ids, y = ~value,
-#               color = ~ group,
-#               fill = 'tonexty',
-#               mode = 'none',
-#               colors = sample_color) %>%
-#       add_lines(color = ~ group) %>%
-#       add_annotations(
-#         text = ~unique(group),
-#         x = 0.5,
-#         y = 1,
-#         yref = "paper",
-#         xref = "paper",
-#         yanchor = "bottom",
-#         showarrow = FALSE,
-#         font = list(size = 15)
-#       )  %>%
-#       layout(
-#         showlegend = F,
-#         xaxis = z1,
-#         xaxis = list(title = "Count Per million")
-#       )
-#     # 
+    # 
+    #     panel <- . %>% 
+    #       plot_ly(x = ~ids, y = ~value,
+    #               color = ~ group,
+    #               fill = 'tonexty',
+    #               mode = 'none',
+    #               colors = sample_color) %>%
+    #       add_lines(color = ~ group) %>%
+    #       add_annotations(
+    #         text = ~unique(group),
+    #         x = 0.5,
+    #         y = 1,
+    #         yref = "paper",
+    #         xref = "paper",
+    #         yanchor = "bottom",
+    #         showarrow = FALSE,
+    #         font = list(size = 15)
+    #       )  %>%
+    #       layout(
+    #         showlegend = F,
+    #         xaxis = z1,
+    #         xaxis = list(title = "Count Per million")
+    #       )
+    #     # 
     # areaPlot <- normalized_sig_counts() %>%
     #   group_by(group) %>%
     #   do(p = panel(.)) %>%
@@ -325,7 +325,7 @@ server <- function(input, output, session) {
     # 
     #  
     # 
-
+    
   })
   
   # not rendered yet
@@ -346,7 +346,7 @@ server <- function(input, output, session) {
             buttons = c('csv', 'excel'),
             text = 'Download'
           )))
-      ))
+    ))
   
   #********************************
   # VOLCANO PLOT
@@ -373,6 +373,8 @@ server <- function(input, output, session) {
     nlog_pCutoff <- -log10(pCutoff)
     fcCutoff <- input$logfc
     
+    sig_labels = get_sig_labels()
+    
     # Get DE table
     X <- DE() %>% na.omit() %>% 
       # TODO: Only work with padj? Why combine both?
@@ -380,11 +382,11 @@ server <- function(input, output, session) {
         neg_log10_p = -log10(pvalue)
       ) %>%
       mutate(signif_col  =
-              ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[1],
-              ifelse(neg_log10_p <  nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[2],
-              ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) <  fcCutoff, sig_labels[3],
-                  sig_labels[4]
-          )))
+               ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[1],
+                      ifelse(neg_log10_p <  nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[2],
+                             ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) <  fcCutoff, sig_labels[3],
+                                    sig_labels[4]
+                             )))
       ) %>%
       mutate(signif_col = factor(signif_col, levels = sig_labels)) 
     # Subset some of the non-significative genes to ommit overload the plot
@@ -401,6 +403,11 @@ server <- function(input, output, session) {
     return(X)
   })
   
+  #
+  get_sig_labels <- function(){
+    return(c('p-value and log<sub>2</sub>FC', 'p-value', 'log<sub>2</sub>FC', 'NS'))
+  }
+  
   #********************************
   output$volcano <-  renderPlotly({
     
@@ -413,7 +420,7 @@ server <- function(input, output, session) {
     X <- get_X_volcano()
     
     # Sig. Labels
-    sig_labels = c('p-value and log<sub>2</sub>FC', 'p-value', 'log<sub>2</sub>FC', 'NS')
+    sig_labels = get_sig_labels()
     volcano_colors = c('#DC0D0D',  '#27A871', '#0D8DB0', '#80847C')
     
     # Create the Volcano plot unisng plotly
@@ -450,7 +457,7 @@ server <- function(input, output, session) {
   
   # message menu istead of boxes ----
   # output$messageMenu <- renderMenu({
-    observeEvent(input$buttom, {  
+  observeEvent(input$buttom, {  
     samples <- names(table(sam()$group))
     sampleA <- samples[1]
     sampleB <- samples[2]
@@ -467,7 +474,7 @@ server <- function(input, output, session) {
     messageA <- paste0(n_genes_A ," ", caption)
     messageB <- paste0(n_genes_B ," ", caption)
     
-
+    
     messageC <- paste0(nrow(signif) ," significance genes")
     
     messageA <- data.frame(from = sampleA, message = messageA)
@@ -493,7 +500,7 @@ server <- function(input, output, session) {
     
     # row_side_colors <- colData(dds)
     # row_side_colors <- sam[, sam$group]
- 
+    
     normalized_sig_counts() %>%
       pivot_wider(names_from = group, values_from = value,  
                   values_fill = list(value = 0)) %>%
@@ -509,8 +516,8 @@ server <- function(input, output, session) {
   })
   
   
-    
-
+  
+  
 }
 
 shinyApp(ui = ui, server = server)
