@@ -381,13 +381,12 @@ server <- function(input, output, session) {
       mutate(
         neg_log10_p = -log10(pvalue)
       ) %>%
-      mutate(signif_col  =
-               ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[1],
-                      ifelse(neg_log10_p <  nlog_pCutoff & abs(log2FoldChange) >= fcCutoff, sig_labels[2],
-                             ifelse(neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) <  fcCutoff, sig_labels[3],
-                                    sig_labels[4]
-                             )))
-      ) %>%
+      mutate(signif_col = case_when(
+        neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) >= fcCutoff ~ sig_labels[1],
+        neg_log10_p <  nlog_pCutoff & abs(log2FoldChange) >= fcCutoff ~ sig_labels[2],
+        neg_log10_p >= nlog_pCutoff & abs(log2FoldChange) <  fcCutoff ~ sig_labels[3],
+        TRUE ~ sig_labels[4]
+      )) %>%
       mutate(signif_col = factor(signif_col, levels = sig_labels)) 
     # Subset some of the non-significative genes to ommit overload the plot
     non_sig <- filter(X, signif_col == 'NS')
